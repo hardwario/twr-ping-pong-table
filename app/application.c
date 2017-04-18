@@ -10,7 +10,11 @@
 #include <bc_gpio.h>
 #include <bcl.h>
 
+#define RED_BUTTON_GPIO BC_GPIO_P4
+#define BLUE_BUTTON_GPIO BC_GPIO_P5
+#define PIEZO_BUTTON_GPIO BC_GPIO_P6 // Not used now
 #define MAX 20
+
 #define LED_COUNT 204
 #define LED_COUNT_PER_POINT ((float)((LED_COUNT - 1.) / MAX))
 #define BRIGHTNESS_RED 40
@@ -27,6 +31,7 @@ static bc_button_t button_reset_red;
 static bc_button_t button_reset_blue;
 
 static bool effect_in_progress;
+bc_tick_t sensor_module_task_delay = 100;
 bc_scheduler_task_id_t reset_task_id;
 
 // Create costume led strip buffer
@@ -164,32 +169,39 @@ void button_reset_event_handler(bc_button_t *self, bc_button_event_t event, void
 
 void application_init(void)
 {
+    // Initialize
+    bc_tca9534a_t expander;
+    bc_tca9534a_init(&expander, BC_I2C_I2C0, 0x3e);
+    bc_tca9534a_set_port_direction(&expander, 0);
+    bc_tca9534a_write_port(&expander, 0x60);
+
     // Initialize power module with led strip
     bc_module_power_init();
     bc_led_strip_init(&led_strip, bc_module_power_get_led_strip_driver(), &_led_strip_buffer_rgbw_204);
 
     // Initialize red button
-    bc_button_init(&button_red, BC_GPIO_P3, BC_GPIO_PULL_DOWN, false);
+    bc_button_init(&button_red, RED_BUTTON_GPIO, BC_GPIO_PULL_UP, true);
     bc_button_set_event_handler(&button_red, button_score_event_handler, NULL);
 
     // Initialize reset red button
-    bc_button_init(&button_reset_red, BC_GPIO_P3, BC_GPIO_PULL_DOWN, false);
+    bc_button_init(&button_reset_red, RED_BUTTON_GPIO, BC_GPIO_PULL_UP, true);
     bc_button_set_event_handler(&button_reset_red, button_reset_event_handler, NULL);
     bc_button_set_hold_time(&button_reset_red, 4000);
 
     // Initialize blue button
-    bc_button_init(&button_blue, BC_GPIO_P2, BC_GPIO_PULL_DOWN, false);
+    bc_button_init(&button_blue, BLUE_BUTTON_GPIO, BC_GPIO_PULL_UP, true);
     bc_button_set_event_handler(&button_blue, button_score_event_handler, NULL);
 
     // Initialize reset blue button
-    bc_button_init(&button_reset_blue, BC_GPIO_P2, BC_GPIO_PULL_DOWN, false);
+    bc_button_init(&button_reset_blue, BLUE_BUTTON_GPIO, BC_GPIO_PULL_UP, true);
     bc_button_set_event_handler(&button_reset_blue, button_reset_event_handler, NULL);
     bc_button_set_hold_time(&button_reset_blue, 4000);
 
     // Initialize piezo gpio pin
-    bc_gpio_init(BC_GPIO_P5);
-    bc_gpio_set_mode(BC_GPIO_P5, BC_GPIO_MODE_OUTPUT);
+    bc_gpio_init(PIEZO_BUTTON_GPIO);
+    bc_gpio_set_mode(PIEZO_BUTTON_GPIO, BC_GPIO_MODE_OUTPUT);
 
     reset_task_id = bc_scheduler_register(reset_game, NULL, BC_TICK_INFINITY);
+
     reset_game();
 }
