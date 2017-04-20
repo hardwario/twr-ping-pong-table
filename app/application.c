@@ -12,7 +12,7 @@
 
 #define RED_BUTTON_GPIO BC_GPIO_P4
 #define BLUE_BUTTON_GPIO BC_GPIO_P5
-#define PIEZO_BUTTON_GPIO BC_GPIO_P6 // Not used now
+#define PIEZO_GPIO BC_GPIO_P6 // Not used now
 #define MAX 20
 
 #define LED_COUNT 204
@@ -62,10 +62,10 @@ void piezo()
     {
         for (j = 0; j < 400; j++)
             ;
-        bc_gpio_set_output(BC_GPIO_P5, true);
+        bc_gpio_set_output(PIEZO_GPIO, true);
         for (j = 0; j < 400; j++)
             ;
-        bc_gpio_set_output(BC_GPIO_P5, false);
+        bc_gpio_set_output(PIEZO_GPIO, false);
     }
 }
 
@@ -169,7 +169,7 @@ void button_reset_event_handler(bc_button_t *self, bc_button_event_t event, void
 
 void application_init(void)
 {
-    // Initialize
+    // Initialize (just to be sure)
     bc_tca9534a_t expander;
     bc_tca9534a_init(&expander, BC_I2C_I2C0, 0x3e);
     bc_tca9534a_set_port_direction(&expander, 0);
@@ -198,8 +198,8 @@ void application_init(void)
     bc_button_set_hold_time(&button_reset_blue, 4000);
 
     // Initialize piezo gpio pin
-    bc_gpio_init(PIEZO_BUTTON_GPIO);
-    bc_gpio_set_mode(PIEZO_BUTTON_GPIO, BC_GPIO_MODE_OUTPUT);
+    bc_gpio_init(PIEZO_GPIO);
+    bc_gpio_set_mode(PIEZO_GPIO, BC_GPIO_MODE_OUTPUT);
 
     reset_task_id = bc_scheduler_register(reset_game, NULL, BC_TICK_INFINITY);
 
