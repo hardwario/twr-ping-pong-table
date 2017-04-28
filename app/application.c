@@ -1,41 +1,35 @@
-/*
- Visual Studio Code
- Ctrl+Shift+B     to build
- Ctrl+P task dfu  to flash MCU with dfu-util
- */
-
 #include <application.h>
-#include <bc_button.h>
-#include <bc_module_power.h>
-#include <bc_gpio.h>
-#include <bcl.h>
+#include <stm32l0xx.h>
 
 #define RED_BUTTON_GPIO BC_GPIO_P4
 #define BLUE_BUTTON_GPIO BC_GPIO_P5
-#define PIEZO_GPIO BC_GPIO_P6 // Not used now
-#define MAX 20
+#define PIEZO_GPIO BC_GPIO_P6
 
-#define LED_COUNT 204
-#define LED_COUNT_PER_POINT ((float)((LED_COUNT - 1.) / MAX))
 #define BRIGHTNESS_RED 40
 #define BRIGHTNESS_BLUE 40
 #define BRIGHTNESS_WHITE_GAP 40
 
+#define NUMBER_OF_ROUNDS 20
+#define PIEZO_BEEP_TIME 300
+#define PIEZO_BEEP_MODIFIER 40
+#define LED_COUNT 204
+#define LED_COUNT_PER_POINT ((float)((LED_COUNT - 1.) / NUMBER_OF_ROUNDS))
+
 int score_red;
 int score_blue;
 
-static bc_led_strip_t led_strip;
-static bc_button_t button_red;
-static bc_button_t button_blue;
-static bc_button_t button_reset_red;
-static bc_button_t button_reset_blue;
+bc_led_strip_t led_strip;
+bc_button_t button_red;
+bc_button_t button_blue;
+bc_button_t button_reset_red;
+bc_button_t button_reset_blue;
 
-static bool effect_in_progress;
-bc_tick_t sensor_module_task_delay = 100;
-bc_scheduler_task_id_t reset_task_id;
+bool effect_in_progress;
 
-// Create costume led strip buffer
-static uint32_t _dma_buffer_rgb_204[LED_COUNT * sizeof(uint32_t) * 2];
+bc_scheduler_task_id_t game_reset_task_id;
+
+// Create custom led strip buffer
+uint32_t _dma_buffer_rgb_204[LED_COUNT * sizeof(uint32_t) * 2];
 
 const bc_led_strip_buffer_t _led_strip_buffer_rgbw_204 =
 {
@@ -50,26 +44,57 @@ typedef struct
     uint8_t green;
     uint8_t blue;
     uint8_t white;
+
 } colors_t;
 
 colors_t frame_buffer[LED_COUNT];
 
-void piezo()
+void bc_piezo_init(void)
 {
-    volatile unsigned int i, j;
+    // Initialize GPIO pin
+    RCC->IOPENR |= RCC_IOPENR_GPIOBEN;
 
-    for (i = 0; i < 100; i++)
-    {
-        for (j = 0; j < 400; j++)
-            ;
-        bc_gpio_set_output(PIEZO_GPIO, true);
-        for (j = 0; j < 400; j++)
-            ;
-        bc_gpio_set_output(PIEZO_GPIO, false);
-    }
+    // Errata workaround
+    RCC->IOPENR;
+
+    GPIOB->MODER &= ~GPIO_MODER_MODE1_Msk;
+    GPIOB->MODER |= GPIO_MODER_MODE1_1;
+    GPIOB->OSPEEDR |= GPIO_OSPEEDER_OSPEED1;
+    GPIOB->AFR[0] &= GPIO_AFRL_AFRL1_Msk;
+    GPIOB->AFR[0] |= 2 << GPIO_AFRL_AFRL1_Pos;
+
+    // Initialize timer (for PWM)
+    RCC->APB1ENR |= RCC_APB1ENR_TIM3EN;
+
+    // Errata workaround
+    RCC->APB1ENR;
+
+    TIM3->PSC = 210;
+    TIM3->ARR = PIEZO_BEEP_MODIFIER;
+    TIM3->CCR4 = PIEZO_BEEP_MODIFIER / 2;
+    TIM3->CCMR2 |= TIM_CCMR2_OC4M_2 | TIM_CCMR2_OC4M_1 | TIM_CCMR2_OC4PE;
+    TIM3->CCER |= TIM_CCER_CC4E;
+    TIM3->EGR |= TIM_EGR_UG;
 }
 
-void update_led_strip()
+void piezo_beep(void)
+{
+    bc_tick_t tick_end = bc_tick_get() + PIEZO_BEEP_TIME;
+
+    // Start PWM
+    TIM3->CR1 |= TIM_CR1_CEN;
+
+    // Wait PIEZO_BEEP_TIME ms
+    while (tick_end > bc_tick_get())
+    {
+        continue;
+    }
+
+    // Stop PWM
+    TIM3->CR1 &= ~TIM_CR1_CEN;
+}
+
+void update_led_strip(void)
 {
     size_t i;
 
@@ -93,12 +118,12 @@ void update_led_strip()
         frame_buffer[i].white = BRIGHTNESS_WHITE_GAP / 3;
     }
 
-    for (i = 0; i <= (LED_COUNT / LED_COUNT_PER_POINT); i++)
+    for (i = 0; i <= LED_COUNT / LED_COUNT_PER_POINT; i++)
     {
-        frame_buffer[(unsigned int) (i * LED_COUNT_PER_POINT)].red = 0;
-        frame_buffer[(unsigned int) (i * LED_COUNT_PER_POINT)].green = 0;
-        frame_buffer[(unsigned int) (i * LED_COUNT_PER_POINT)].blue = 0;
-        frame_buffer[(unsigned int) (i * LED_COUNT_PER_POINT)].white = BRIGHTNESS_WHITE_GAP;
+        frame_buffer[(uint8_t) (i * LED_COUNT_PER_POINT)].red = 0;
+        frame_buffer[(uint8_t) (i * LED_COUNT_PER_POINT)].green = 0;
+        frame_buffer[(uint8_t) (i * LED_COUNT_PER_POINT)].blue = 0;
+        frame_buffer[(uint8_t) (i * LED_COUNT_PER_POINT)].white = BRIGHTNESS_WHITE_GAP;
     }
 
     bc_led_strip_set_rgbw_framebuffer(&led_strip, (uint8_t *) frame_buffer, LED_COUNT * 4);
@@ -106,12 +131,17 @@ void update_led_strip()
     bc_led_strip_write(&led_strip);
 }
 
-void reset_game()
+void game_reset_task(void *param)
 {
+    (void) param;
+
     effect_in_progress = false;
+
     bc_led_strip_effect_stop(&led_strip);
+
     score_red = 0;
     score_blue = 0;
+
     update_led_strip();
 }
 
@@ -125,14 +155,16 @@ void button_score_event_handler(bc_button_t *self, bc_button_event_t event, void
     {
         if (event == BC_BUTTON_EVENT_CLICK)
         {
-            piezo();
+            piezo_beep();
 
-            if (*score >= MAX)
+            if (*score >= NUMBER_OF_ROUNDS)
             {
                 effect_in_progress = true;
+
                 bc_led_strip_effect_theater_chase(&led_strip, self == &button_blue ? 0x8000 : 0x80000000, 100);
                 bc_led_strip_write(&led_strip);
-                bc_scheduler_plan_relative(reset_task_id, 3000);
+
+                bc_scheduler_plan_relative(game_reset_task_id, 3000);
             }
             else
             {
@@ -142,7 +174,7 @@ void button_score_event_handler(bc_button_t *self, bc_button_event_t event, void
 
         if (event == BC_BUTTON_EVENT_HOLD)
         {
-            piezo();
+            piezo_beep();
 
             if (*score > 0)
             {
@@ -161,21 +193,23 @@ void button_reset_event_handler(bc_button_t *self, bc_button_event_t event, void
 
     if (event == BC_BUTTON_EVENT_HOLD)
     {
-        piezo();
+        piezo_beep();
 
-        reset_game();
+        game_reset_task(NULL);
     }
 }
 
 void application_init(void)
 {
-    // Initialize (just to be sure)
+    bc_module_core_pll_enable();
+
     bc_tca9534a_t expander;
+
     bc_tca9534a_init(&expander, BC_I2C_I2C0, 0x3e);
     bc_tca9534a_set_port_direction(&expander, 0);
     bc_tca9534a_write_port(&expander, 0x60);
 
-    // Initialize power module with led strip
+    // Initialize Power Module with LED strip
     bc_module_power_init();
     bc_led_strip_init(&led_strip, bc_module_power_get_led_strip_driver(), &_led_strip_buffer_rgbw_204);
 
@@ -197,11 +231,10 @@ void application_init(void)
     bc_button_set_event_handler(&button_reset_blue, button_reset_event_handler, NULL);
     bc_button_set_hold_time(&button_reset_blue, 4000);
 
-    // Initialize piezo gpio pin
-    bc_gpio_init(PIEZO_GPIO);
-    bc_gpio_set_mode(PIEZO_GPIO, BC_GPIO_MODE_OUTPUT);
+    // Initialize piezo
+    bc_piezo_init();
 
-    reset_task_id = bc_scheduler_register(reset_game, NULL, BC_TICK_INFINITY);
+    game_reset_task_id = bc_scheduler_register(game_reset_task, NULL, BC_TICK_INFINITY);
 
-    reset_game();
+    game_reset_task(NULL);
 }
