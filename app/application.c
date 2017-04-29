@@ -13,30 +13,7 @@
 #define PIEZO_BEEP_TIME 300
 #define PIEZO_BEEP_MODIFIER 40
 #define LED_COUNT 204
-#define LED_COUNT_PER_POINT ((float)((LED_COUNT - 1.) / NUMBER_OF_ROUNDS))
-
-int score_red;
-int score_blue;
-
-bc_led_strip_t led_strip;
-bc_button_t button_red;
-bc_button_t button_blue;
-bc_button_t button_reset_red;
-bc_button_t button_reset_blue;
-
-bool effect_in_progress;
-
-bc_scheduler_task_id_t game_reset_task_id;
-
-// Create custom led strip buffer
-uint32_t _dma_buffer_rgb_204[LED_COUNT * sizeof(uint32_t) * 2];
-
-const bc_led_strip_buffer_t _led_strip_buffer_rgbw_204 =
-{
-    .type = BC_LED_STRIP_TYPE_RGBW,
-    .count = LED_COUNT,
-    .buffer = _dma_buffer_rgb_204
-};
+#define LED_COUNT_PER_POINT ((float)((LED_COUNT - 1.f) / NUMBER_OF_ROUNDS))
 
 typedef struct
 {
@@ -47,7 +24,30 @@ typedef struct
 
 } colors_t;
 
-colors_t frame_buffer[LED_COUNT];
+int score_red;
+int score_blue;
+
+bool effect_in_progress;
+
+bc_led_strip_t led_strip;
+bc_button_t button_red;
+bc_button_t button_blue;
+bc_button_t button_reset_red;
+bc_button_t button_reset_blue;
+
+bc_scheduler_task_id_t game_reset_task_id;
+
+// Custom LED strip buffer
+uint32_t dma_buffer_rgb_204[LED_COUNT * sizeof(uint32_t) * 2];
+
+const bc_led_strip_buffer_t _led_strip_buffer_rgbw_204 =
+{
+    .type = BC_LED_STRIP_TYPE_RGBW,
+    .count = LED_COUNT,
+    .buffer = dma_buffer_rgb_204
+};
+
+colors_t framebuffer[LED_COUNT];
 
 void bc_piezo_init(void)
 {
@@ -84,8 +84,8 @@ void piezo_beep(void)
     // Start PWM
     TIM3->CR1 |= TIM_CR1_CEN;
 
-    // Wait PIEZO_BEEP_TIME ms
-    while (tick_end > bc_tick_get())
+    // Until desired time elapsed...
+    while (bc_tick_get() < tick_end)
     {
         continue;
     }
@@ -98,35 +98,35 @@ void update_led_strip(void)
 {
     size_t i;
 
-    memset(frame_buffer, 0, sizeof(frame_buffer));
+    memset(framebuffer, 0, sizeof(framebuffer));
 
     for (i = 0; i < (score_red * LED_COUNT_PER_POINT); i++)
     {
-        frame_buffer[i].red = BRIGHTNESS_RED;
+        framebuffer[i].red = BRIGHTNESS_RED;
     }
 
     for (i = 0; i < (score_blue * LED_COUNT_PER_POINT); i++)
     {
-        frame_buffer[i].blue = BRIGHTNESS_BLUE;
+        framebuffer[i].blue = BRIGHTNESS_BLUE;
     }
 
     for (i = 0; i < ((score_red < score_blue ? score_red : score_blue) * LED_COUNT_PER_POINT); i++)
     {
-        frame_buffer[i].red = 0;
-        frame_buffer[i].green = 0;
-        frame_buffer[i].blue = 0;
-        frame_buffer[i].white = BRIGHTNESS_WHITE_GAP / 3;
+        framebuffer[i].red = 0;
+        framebuffer[i].green = 0;
+        framebuffer[i].blue = 0;
+        framebuffer[i].white = BRIGHTNESS_WHITE_GAP / 3;
     }
 
     for (i = 0; i <= LED_COUNT / LED_COUNT_PER_POINT; i++)
     {
-        frame_buffer[(uint8_t) (i * LED_COUNT_PER_POINT)].red = 0;
-        frame_buffer[(uint8_t) (i * LED_COUNT_PER_POINT)].green = 0;
-        frame_buffer[(uint8_t) (i * LED_COUNT_PER_POINT)].blue = 0;
-        frame_buffer[(uint8_t) (i * LED_COUNT_PER_POINT)].white = BRIGHTNESS_WHITE_GAP;
+        framebuffer[(uint8_t) (i * LED_COUNT_PER_POINT)].red = 0;
+        framebuffer[(uint8_t) (i * LED_COUNT_PER_POINT)].green = 0;
+        framebuffer[(uint8_t) (i * LED_COUNT_PER_POINT)].blue = 0;
+        framebuffer[(uint8_t) (i * LED_COUNT_PER_POINT)].white = BRIGHTNESS_WHITE_GAP;
     }
 
-    bc_led_strip_set_rgbw_framebuffer(&led_strip, (uint8_t *) frame_buffer, LED_COUNT * 4);
+    bc_led_strip_set_rgbw_framebuffer(&led_strip, (uint8_t *) framebuffer, LED_COUNT * 4);
 
     bc_led_strip_write(&led_strip);
 }
