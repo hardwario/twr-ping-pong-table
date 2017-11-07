@@ -1,7 +1,7 @@
-# BigClown Repository bc-core-module
+<a href="https://www.bigclown.com/"><img src="https://bigclown.sirv.com/logo.png" width="200" height="59" alt="BigClown Logo" align="right"></a>
 
-This repository contains firmware skeleton for [Core Module](https://shop.bigclown.com/products/core-module).
+# BigClown Ping Pong Table
 
-If you want to get more information about Core Module, firmware and how to work with it, please follow this link:
+---
 
-**https://doc.bigclown.com/core-module.html**
+Made with &#x2764;&nbsp; by [**HARDWARIO s.r.o.**](https://www.hardwario.com/) in the heart of Europe.
