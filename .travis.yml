@@ -1,25 +1,21 @@
 dist: trusty
-
 language: c
-
 addons:
   apt:
     sources:
     - sourceline: 'ppa:team-gcc-arm-embedded/ppa'
     packages:
-    - gcc-arm-embedded=6-2017q1-1*
-
-script: ./build.sh
-
+    - gcc-arm-embedded
+script:
+  - make release OUT=bcf-ping-pong-table-${TRAVIS_TAG} VERSION=${TRAVIS_TAG}
 deploy:
     skip_cleanup: true
     file_glob: true
-    file: "out/*.bin"
+    file: out/release/*.bin
     api_key: "${GITHUB_KEY}"
     provider: releases
     overwrite: true
     on:
        tags: true
-
 notifications:
     email: false
