@@ -1,0 +1,12 @@
+article: https://www.bigclown.com/doc/projects/radio-smart-led-strip/
+video: https://www.youtube.com/watch?v=otJfNo_x1-Q
+articles:
+  - title: HARDWARIO Ping Pong Table
+    url: https://www.hackster.io/jakub-smejkal/hardwario-ping-pong-table-a9d97e
+    description: Upgrade your ping pong table so you won't have to remember score any more. The player who scores pushes the button and that's it.
+    images:
+      - url: https://hackster.imgix.net/uploads/attachments/1050339/_ngX05c6JvK.blob?auto=compress%2Cformat&w=900&h=675&fit=min
+assembly:
+  - name: HARDWARIO Cover Module
+  - name: HARDWARIO Core Module
+  - name: HARDWARIO Power Module
