@@ -201,7 +201,7 @@ void button_reset_event_handler(bc_button_t *self, bc_button_event_t event, void
 
 void application_init(void)
 {
-    bc_module_core_pll_enable();
+    bc_system_pll_enable();
 
     bc_tca9534a_t expander;
 
