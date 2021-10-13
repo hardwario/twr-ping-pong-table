@@ -2,7 +2,7 @@
 
 # HARDWARIO Ping Pong Table
 
-[![Travis](https://img.shields.io/travis/bigclownlabs/bcf-ping-pong-table/master.svg)](https://travis-ci.org/bigclownlabs/bcf-ping-pong-table)
+[![build](https://github.com/hardwario/twr-ping-pong-table/actions/workflows/main.yml/badge.svg)](https://github.com/hardwario/twr-ping-pong-table/actions/workflows/main.yml)
 [![Release](https://img.shields.io/github/release/bigclownlabs/bcf-ping-pong-table.svg)](https://github.com/bigclownlabs/bcf-ping-pong-table/releases)
 [![License](https://img.shields.io/github/license/bigclownlabs/bcf-ping-pong-table.svg)](https://github.com/bigclownlabs/bcf-ping-pong-table/blob/master/LICENSE)
 [![Twitter](https://img.shields.io/twitter/follow/hardwario_en.svg?style=social&label=Follow)](https://twitter.com/hardwario_en)
