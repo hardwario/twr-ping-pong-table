@@ -1,9 +1,9 @@
 #include <application.h>
 #include <stm32l0xx.h>
 
-#define RED_BUTTON_GPIO BC_GPIO_P4
-#define BLUE_BUTTON_GPIO BC_GPIO_P5
-#define PIEZO_GPIO BC_GPIO_P6
+#define RED_BUTTON_GPIO TWR_GPIO_P4
+#define BLUE_BUTTON_GPIO TWR_GPIO_P5
+#define PIEZO_GPIO TWR_GPIO_P6
 
 #define BRIGHTNESS_RED 40
 #define BRIGHTNESS_BLUE 40
@@ -29,27 +29,27 @@ int score_blue;
 
 bool effect_in_progress;
 
-bc_led_strip_t led_strip;
-bc_button_t button_red;
-bc_button_t button_blue;
-bc_button_t button_reset_red;
-bc_button_t button_reset_blue;
+twr_led_strip_t led_strip;
+twr_button_t button_red;
+twr_button_t button_blue;
+twr_button_t button_reset_red;
+twr_button_t button_reset_blue;
 
-bc_scheduler_task_id_t game_reset_task_id;
+twr_scheduler_task_id_t game_reset_task_id;
 
 // Custom LED strip buffer
 uint32_t dma_buffer_rgb_204[LED_COUNT * sizeof(uint32_t) * 2];
 
-const bc_led_strip_buffer_t _led_strip_buffer_rgbw_204 =
+const twr_led_strip_buffer_t _led_strip_buffer_rgbw_204 =
 {
-    .type = BC_LED_STRIP_TYPE_RGBW,
+    .type = TWR_LED_STRIP_TYPE_RGBW,
     .count = LED_COUNT,
     .buffer = dma_buffer_rgb_204
 };
 
 colors_t framebuffer[LED_COUNT];
 
-void bc_piezo_init(void)
+void twr_piezo_init(void)
 {
     // Initialize GPIO pin
     RCC->IOPENR |= RCC_IOPENR_GPIOBEN;
@@ -60,8 +60,8 @@ void bc_piezo_init(void)
     GPIOB->MODER &= ~GPIO_MODER_MODE1_Msk;
     GPIOB->MODER |= GPIO_MODER_MODE1_1;
     GPIOB->OSPEEDR |= GPIO_OSPEEDER_OSPEED1;
-    GPIOB->AFR[0] &= GPIO_AFRL_AFRL1_Msk;
-    GPIOB->AFR[0] |= 2 << GPIO_AFRL_AFRL1_Pos;
+    GPIOB->AFR[0] &= GPIO_AFRL_AFSEL1_Pos;
+    GPIOB->AFR[0] |= 2 << GPIO_AFRL_AFSEL1_Pos;
 
     // Initialize timer (for PWM)
     RCC->APB1ENR |= RCC_APB1ENR_TIM3EN;
@@ -79,13 +79,13 @@ void bc_piezo_init(void)
 
 void piezo_beep(void)
 {
-    bc_tick_t tick_end = bc_tick_get() + PIEZO_BEEP_TIME;
+    twr_tick_t tick_end = twr_tick_get() + PIEZO_BEEP_TIME;
 
     // Start PWM
     TIM3->CR1 |= TIM_CR1_CEN;
 
     // Until desired time elapsed...
-    while (bc_tick_get() < tick_end)
+    while (twr_tick_get() < tick_end)
     {
         continue;
     }
@@ -126,9 +126,9 @@ void update_led_strip(void)
         framebuffer[(uint8_t) (i * LED_COUNT_PER_POINT)].white = BRIGHTNESS_WHITE_GAP;
     }
 
-    bc_led_strip_set_rgbw_framebuffer(&led_strip, (uint8_t *) framebuffer, LED_COUNT * 4);
+    twr_led_strip_set_rgbw_framebuffer(&led_strip, (uint8_t *) framebuffer, LED_COUNT * 4);
 
-    bc_led_strip_write(&led_strip);
+    twr_led_strip_write(&led_strip);
 }
 
 void game_reset_task(void *param)
@@ -137,7 +137,7 @@ void game_reset_task(void *param)
 
     effect_in_progress = false;
 
-    bc_led_strip_effect_stop(&led_strip);
+    twr_led_strip_effect_stop(&led_strip);
 
     score_red = 0;
     score_blue = 0;
@@ -145,7 +145,7 @@ void game_reset_task(void *param)
     update_led_strip();
 }
 
-void button_score_event_handler(bc_button_t *self, bc_button_event_t event, void *event_param)
+void button_score_event_handler(twr_button_t *self, twr_button_event_t event, void *event_param)
 {
     (void) event_param;
 
@@ -153,7 +153,7 @@ void button_score_event_handler(bc_button_t *self, bc_button_event_t event, void
 
     if (!effect_in_progress)
     {
-        if (event == BC_BUTTON_EVENT_CLICK)
+        if (event == TWR_BUTTON_EVENT_CLICK)
         {
             piezo_beep();
 
@@ -161,10 +161,10 @@ void button_score_event_handler(bc_button_t *self, bc_button_event_t event, void
             {
                 effect_in_progress = true;
 
-                bc_led_strip_effect_theater_chase(&led_strip, self == &button_blue ? 0x8000 : 0x80000000, 100);
-                bc_led_strip_write(&led_strip);
+                twr_led_strip_effect_theater_chase(&led_strip, self == &button_blue ? 0x8000 : 0x80000000, 100);
+                twr_led_strip_write(&led_strip);
 
-                bc_scheduler_plan_relative(game_reset_task_id, 3000);
+                twr_scheduler_plan_relative(game_reset_task_id, 3000);
             }
             else
             {
@@ -172,7 +172,7 @@ void button_score_event_handler(bc_button_t *self, bc_button_event_t event, void
             }
         }
 
-        if (event == BC_BUTTON_EVENT_HOLD)
+        if (event == TWR_BUTTON_EVENT_HOLD)
         {
             piezo_beep();
 
@@ -186,12 +186,12 @@ void button_score_event_handler(bc_button_t *self, bc_button_event_t event, void
     }
 }
 
-void button_reset_event_handler(bc_button_t *self, bc_button_event_t event, void *event_param)
+void button_reset_event_handler(twr_button_t *self, twr_button_event_t event, void *event_param)
 {
     (void) self;
     (void) event_param;
 
-    if (event == BC_BUTTON_EVENT_HOLD)
+    if (event == TWR_BUTTON_EVENT_HOLD)
     {
         piezo_beep();
 
@@ -201,40 +201,40 @@ void button_reset_event_handler(bc_button_t *self, bc_button_event_t event, void
 
 void application_init(void)
 {
-    bc_system_pll_enable();
+    twr_system_pll_enable();
 
-    bc_tca9534a_t expander;
+    twr_tca9534a_t expander;
 
-    bc_tca9534a_init(&expander, BC_I2C_I2C0, 0x3e);
-    bc_tca9534a_set_port_direction(&expander, 0);
-    bc_tca9534a_write_port(&expander, 0x60);
+    twr_tca9534a_init(&expander, TWR_I2C_I2C0, 0x3e);
+    twr_tca9534a_set_port_direction(&expander, 0);
+    twr_tca9534a_write_port(&expander, 0x60);
 
     // Initialize Power Module with LED strip
-    bc_module_power_init();
-    bc_led_strip_init(&led_strip, bc_module_power_get_led_strip_driver(), &_led_strip_buffer_rgbw_204);
+    twr_module_power_init();
+    twr_led_strip_init(&led_strip, twr_module_power_get_led_strip_driver(), &_led_strip_buffer_rgbw_204);
 
     // Initialize red button
-    bc_button_init(&button_red, RED_BUTTON_GPIO, BC_GPIO_PULL_UP, true);
-    bc_button_set_event_handler(&button_red, button_score_event_handler, NULL);
+    twr_button_init(&button_red, RED_BUTTON_GPIO, TWR_GPIO_PULL_UP, true);
+    twr_button_set_event_handler(&button_red, button_score_event_handler, NULL);
 
     // Initialize reset red button
-    bc_button_init(&button_reset_red, RED_BUTTON_GPIO, BC_GPIO_PULL_UP, true);
-    bc_button_set_event_handler(&button_reset_red, button_reset_event_handler, NULL);
-    bc_button_set_hold_time(&button_reset_red, 4000);
+    twr_button_init(&button_reset_red, RED_BUTTON_GPIO, TWR_GPIO_PULL_UP, true);
+    twr_button_set_event_handler(&button_reset_red, button_reset_event_handler, NULL);
+    twr_button_set_hold_time(&button_reset_red, 4000);
 
     // Initialize blue button
-    bc_button_init(&button_blue, BLUE_BUTTON_GPIO, BC_GPIO_PULL_UP, true);
-    bc_button_set_event_handler(&button_blue, button_score_event_handler, NULL);
+    twr_button_init(&button_blue, BLUE_BUTTON_GPIO, TWR_GPIO_PULL_UP, true);
+    twr_button_set_event_handler(&button_blue, button_score_event_handler, NULL);
 
     // Initialize reset blue button
-    bc_button_init(&button_reset_blue, BLUE_BUTTON_GPIO, BC_GPIO_PULL_UP, true);
-    bc_button_set_event_handler(&button_reset_blue, button_reset_event_handler, NULL);
-    bc_button_set_hold_time(&button_reset_blue, 4000);
+    twr_button_init(&button_reset_blue, BLUE_BUTTON_GPIO, TWR_GPIO_PULL_UP, true);
+    twr_button_set_event_handler(&button_reset_blue, button_reset_event_handler, NULL);
+    twr_button_set_hold_time(&button_reset_blue, 4000);
 
     // Initialize piezo
-    bc_piezo_init();
+    twr_piezo_init();
 
-    game_reset_task_id = bc_scheduler_register(game_reset_task, NULL, BC_TICK_INFINITY);
+    game_reset_task_id = twr_scheduler_register(game_reset_task, NULL, TWR_TICK_INFINITY);
 
     game_reset_task(NULL);
 }
