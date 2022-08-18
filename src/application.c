@@ -60,8 +60,8 @@ void twr_piezo_init(void)
     GPIOB->MODER &= ~GPIO_MODER_MODE1_Msk;
     GPIOB->MODER |= GPIO_MODER_MODE1_1;
     GPIOB->OSPEEDR |= GPIO_OSPEEDER_OSPEED1;
-    GPIOB->AFR[0] &= GPIO_AFRL_AFSEL1_Pos;
-    GPIOB->AFR[0] |= 2 << GPIO_AFRL_AFSEL1_Pos;
+    GPIOB->AFR[0] &= GPIO_AFRL_AFRL1_Msk;
+    GPIOB->AFR[0] |= 2 << GPIO_AFRL_AFRL1_Pos;
 
     // Initialize timer (for PWM)
     RCC->APB1ENR |= RCC_APB1ENR_TIM3EN;
